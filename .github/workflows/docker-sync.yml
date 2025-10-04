@@ -3,8 +3,8 @@ name: 镜像同步到阿里云仓库
 on:
   workflow_dispatch:
     inputs:
-      IMAGE_LIST:
-        description: "请在"IMAGE_LIST"输入要同步的镜像列表（逗号分隔，例如：nginx:latest,redis/redis:latest）"
+      IMAGE_LIST: 
+        description: "请在'IMAGE_LIST'输入要同步的镜像列表（例如：nginx:latest,redis/redis:latest）"
         required: true
         default: "nginx:latest"
 
