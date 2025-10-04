@@ -1,0 +1,116 @@
+name: 镜像同步到阿里云仓库
+
+on:
+  workflow_dispatch:
+    inputs:
+      IMAGE_LIST:
+        description: "输入要同步的镜像列表（逗号分隔，例如：nginx:latest,redis/redis:latest）"
+        required: true
+        default: "nginx:latest"
+
+  push:
+    branches: [ main ]
+
+env:
+  ALIYUN_REGISTRY: "${{ secrets.ALIYUN_REGISTRY }}"               # 例：registry.cn-hangzhou.aliyuncs.com
+  ALIYUN_NAME_SPACE: "${{ secrets.ALIYUN_NAME_SPACE }}"           # 阿里云命名空间
+  ALIYUN_REGISTRY_USER: "${{ secrets.ALIYUN_REGISTRY_USER }}"     # 阿里云用户名
+  ALIYUN_REGISTRY_PASSWORD: "${{ secrets.ALIYUN_REGISTRY_PASSWORD }}" # 阿里云密码或Token
+
+  DOCKERHUB_USER: "${{ secrets.DOCKERHUB_USER }}"                 # DockerHub 用户名
+  DOCKERHUB_TOKEN: "${{ secrets.DOCKERHUB_TOKEN }}"               # DockerHub Token (支持私有镜像拉取)
+
+jobs:
+  sync:
+    name: 同步镜像到阿里云
+    runs-on: ubuntu-latest
+    steps:
+      - name: 🧹 查看初始磁盘空间
+        run: |
+          df -hT
+
+      - name: 💾 释放构建空间
+        uses: easimon/maximize-build-space@master
+        with:
+          root-reserve-mb: 2048
+          swap-size-mb: 128
+          remove-dotnet: 'true'
+          remove-haskell: 'true'
+          build-mount-path: '/var/lib/docker/'
+
+      - name: 🔁 重启 Docker 服务
+        run: sudo service docker restart
+
+      - name: ✅ 查看释放后磁盘空间
+        run: df -hT
+
+      - name: 📦 检出代码仓库
+        uses: actions/checkout@v4
+
+      - name: 🧰 安装 Buildx 环境
+        uses: docker/setup-buildx-action@v3
+
+      - name: 🔐 登录阿里云镜像仓库
+        run: |
+          echo "${ALIYUN_REGISTRY_PASSWORD}" | docker login -u "${ALIYUN_REGISTRY_USER}" --password-stdin "${ALIYUN_REGISTRY}"
+
+      - name: 🔐 登录 Docker Hub（用于拉取私有镜像）
+        run: |
+          if [ -n "${DOCKERHUB_USER}" ] && [ -n "${DOCKERHUB_TOKEN}" ]; then
+            echo "${DOCKERHUB_TOKEN}" | docker login -u "${DOCKERHUB_USER}" --password-stdin
+          else
+            echo "未配置 Docker Hub 凭据，将仅能拉取公共镜像。"
+          fi
+
+      - name: 🚀 开始同步镜像到阿里云
+        run: |
+          set -e
+          IFS=',' read -ra IMAGES <<< "${{ github.event.inputs.IMAGE_LIST }}"
+
+          for image in "${IMAGES[@]}"; do
+            echo "============================"
+            echo "准备同步镜像: $image"
+            echo "============================"
+
+            # 去掉多余空格
+            image=$(echo "$image" | xargs)
+
+            # 检查是否包含 tag，没有则默认 latest
+            if [[ "$image" != *":"* ]]; then
+              image="$image:latest"
+            fi
+
+            # 提取命名空间和镜像名
+            image_name_tag=$(echo "$image" | awk -F'/' '{print $NF}')
+            name_space=$(echo "$image" | awk -F'/' '{if (NF==3) print $2; else if (NF==2) print $1; else print "library"}')
+            image_name=$(echo "$image_name_tag" | awk -F':' '{print $1}')
+
+            echo "命名空间: $name_space"
+            echo "镜像名称: $image_name_tag"
+
+            # 尝试拉取镜像（自动判断架构）
+            echo "🔽 拉取镜像 $image"
+            docker pull "$image"
+
+            # 支持多架构的标签命名（自动生成唯一前缀）
+            platform=$(docker inspect "$image" --format '{{.Architecture}}' || echo "unknown")
+            platform_prefix="${platform//\//_}_"
+
+            # 生成新的阿里云镜像地址
+            new_image="${ALIYUN_REGISTRY}/${ALIYUN_NAME_SPACE}/${platform_prefix}${name_space}_${image_name_tag}"
+
+            echo "🏷️ 标记镜像: $new_image"
+            docker tag "$image" "$new_image"
+
+            echo "⬆️ 推送镜像到阿里云..."
+            docker push "$new_image"
+
+            echo "🧹 清理镜像释放空间"
+            docker rmi "$image" || true
+            docker rmi "$new_image" || true
+
+            echo "✅ 镜像同步完成: $image -> $new_image"
+          done
+
+      - name: 🧾 查看同步后的磁盘空间
+        run: df -hT
