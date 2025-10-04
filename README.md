@@ -1,6 +1,6 @@
 # 🚀 阿里云镜像同步工具（Aliyun Docker Mirror Sync）
 
-将国外或私有的 Docker 镜像一键同步到阿里云镜像仓库（支持多架构、私有仓库、批量操作）。本仓库灵感来源于 docker_images_pusher 仓库（repect）。
+将国外或私有的 Docker 镜像一键同步到阿里云镜像仓库（支持多架构、私有仓库、批量操作）。本仓库灵感来源于[docker_images_pusher](https://github.com/tech-shrimp/docker_image_pusher)仓库,repect!
 
 ---
 
@@ -11,16 +11,6 @@
 ✅ 自动处理多架构（amd64 / arm64）  
 ✅ 自动打标签防止命名冲突  
 ✅ 支持 workflow 手动触发 / 自动运行  
-
----
-
-## 🧩 仓库结构
-
-.
-├── .github/
-│   └── workflows/
-│       └── docker-sync.yml   # 主工作流文件（GitHub Actions 自动执行）
-└── README.md                 # 使用说明文档
 
 ---
 

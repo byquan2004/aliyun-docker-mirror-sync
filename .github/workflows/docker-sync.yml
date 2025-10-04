@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       IMAGE_LIST:
-        description: "输入要同步的镜像列表（逗号分隔，例如：nginx:latest,redis/redis:latest）"
+        description: "请在"IMAGE_LIST"输入要同步的镜像列表（逗号分隔，例如：nginx:latest,redis/redis:latest）"
         required: true
         default: "nginx:latest"
 
@@ -52,12 +52,12 @@ jobs:
 
       - name: 🔐 登录阿里云镜像仓库
         run: |
-          echo "${ALIYUN_REGISTRY_PASSWORD}" | docker login -u "${ALIYUN_REGISTRY_USER}" --password-stdin "${ALIYUN_REGISTRY}"
+          echo "$ALIYUN_REGISTRY_PASSWORD" | docker login -u "$ALIYUN_REGISTRY_USER" --password-stdin "$ALIYUN_REGISTRY"
 
       - name: 🔐 登录 Docker Hub（用于拉取私有镜像）
         run: |
-          if [ -n "${DOCKERHUB_USER}" ] && [ -n "${DOCKERHUB_TOKEN}" ]; then
-            echo "${DOCKERHUB_TOKEN}" | docker login -u "${DOCKERHUB_USER}" --password-stdin
+          if [ -n "$DOCKERHUB_USER" ] && [ -n "$DOCKERHUB_TOKEN" ]; then
+            echo "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USER" --password-stdin
           else
             echo "未配置 Docker Hub 凭据，将仅能拉取公共镜像。"
           fi
@@ -97,7 +97,7 @@ jobs:
             platform_prefix="${platform//\//_}_"
 
             # 生成新的阿里云镜像地址
-            new_image="${ALIYUN_REGISTRY}/${ALIYUN_NAME_SPACE}/${platform_prefix}${name_space}_${image_name_tag}"
+            new_image="$ALIYUN_REGISTRY/$ALIYUN_NAME_SPACE/${platform_prefix}${name_space}_${image_name_tag}"
 
             echo "🏷️ 标记镜像: $new_image"
             docker tag "$image" "$new_image"
